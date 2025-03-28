@@ -18,10 +18,16 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return user ? <>{children}</> : <Navigate to="/login" />;
 }
 
-function App() {
+interface AppProps {
+  // Standard prop names for embedded mode
+  authToken?: string;
+  tenantName?: string;
+}
+
+function App({ authToken, tenantName }: AppProps = {}) {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <AuthProvider authToken={authToken} tenantName={tenantName}>
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />

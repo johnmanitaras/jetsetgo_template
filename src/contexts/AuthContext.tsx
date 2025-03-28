@@ -11,6 +11,7 @@ interface AuthContextType {
   userId: string | null;
   groups: GroupInfo[];
   permissions: string[];
+  isEmbedded: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,19 +21,56 @@ const AuthContext = createContext<AuthContextType>({
   userId: null,
   groups: [],
   permissions: [],
+  isEmbedded: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+interface AuthProviderProps {
+  children: React.ReactNode;
+  authToken?: string;
+  tenantName?: string;
+}
+
+export function AuthProvider({ children, authToken, tenantName }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [groups, setGroups] = useState<GroupInfo[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [isEmbedded, setIsEmbedded] = useState<boolean>(false);
 
+  // Check if we're in embedded mode (props provided by parent)
   useEffect(() => {
+    if (authToken && tenantName) {
+      console.log('Running in embedded mode with provided auth token and tenant name');
+      setIsEmbedded(true);
+      
+      // Create a minimal tenant object with the provided tenant name
+      setTenant({ id: 'embedded', name: tenantName });
+      
+      // We don't have a full user object in embedded mode, but we can set a placeholder
+      // The actual token will be used in API calls
+      setUser({} as User);
+      
+      // Set minimal user info
+      setUserId('embedded-user');
+      
+      // In embedded mode, we don't have groups and permissions from Firebase
+      // These would typically come from the parent application if needed
+      setGroups([]);
+      setPermissions([]);
+      
+      setLoading(false);
+    }
+  }, [authToken, tenantName]);
+
+  // Only run Firebase auth if not in embedded mode
+  useEffect(() => {
+    // Skip Firebase auth if we're in embedded mode
+    if (isEmbedded) return;
+    
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const idTokenResult = await user.getIdTokenResult();
@@ -71,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribe();
       authChannel.removeEventListener('message', handleAuthMessage);
     };
-  }, []);
+  }, [isEmbedded]);
 
   const value = {
     user,
@@ -80,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userId,
     groups,
     permissions,
+    isEmbedded,
   };
 
   return (
